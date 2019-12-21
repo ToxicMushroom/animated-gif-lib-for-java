@@ -62,7 +62,7 @@ public class GifDecoder {
     protected int gctSize; // size of global color table
     protected int loopCount = 1; // iterations; 0 = repeat forever
 
-    protected int[] gct; // global color table
+    int[] gct; // global color table
     protected int[] lct; // local color table
     protected int[] act; // active color table
 
@@ -126,7 +126,11 @@ public class GifDecoder {
      */
     public int getTransColor(int n) {
         GifFrame frame = frames.get(n);
-        return act[transIndex];
+        if (frame.lct.length > transIndex) {
+            return frame.lct[transIndex];
+        } else {
+            return -1;
+        }
     }
 
     /**
@@ -738,8 +742,8 @@ public class GifDecoder {
         if (transparency) {
             act[transIndex] = save;
         }
-        resetFrame();
 
+        resetFrame();
     }
 
     /**
