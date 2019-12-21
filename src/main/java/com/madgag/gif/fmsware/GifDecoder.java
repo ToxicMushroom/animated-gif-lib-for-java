@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Class GifDecoder - Decodes a GIF file into one or more frames.
@@ -52,7 +53,7 @@ public class GifDecoder {
      */
     public static final int STATUS_OPEN_ERROR = 2;
 
-    protected BufferedInputStream in;
+    protected BufferedInputStream inputStream;
     protected int status;
 
     protected int width; // full image width
@@ -90,8 +91,7 @@ public class GifDecoder {
     protected int delay = 0; // delay in milliseconds
     protected int transIndex; // transparent color index
 
-    protected static final int MaxStackSize = 4096;
-    // max decoder pixel stack size
+    protected static final int MAX_STACK_SIZE = 4096;// max decoder pixel stack size
 
     // LZW decoder working arrays
     protected short[] prefix;
@@ -99,17 +99,34 @@ public class GifDecoder {
     protected byte[] pixelStack;
     protected byte[] pixels;
 
-    protected ArrayList frames; // frames read from current file
+    protected List<GifFrame> frames; // frames read from current file
     protected int frameCount;
 
     public static class GifFrame {
-        public GifFrame(BufferedImage im, int del) {
-            image = im;
-            delay = del;
+        public GifFrame(BufferedImage image, int delay, int[] lct, int bgIndex, int transIndex) {
+            this.image = image;
+            this.delay = delay;
+            this.lct = lct;
+            this.bgIndex = bgIndex;
+            this.transIndex = transIndex;
         }
 
         public BufferedImage image;
         public int delay;
+        public int[] lct;
+        public int bgIndex;
+        public int transIndex;
+    }
+
+    /**
+     * Gets transparency color for specified frame.
+     *
+     * @param n int index of frame
+     * @return int transparency color
+     */
+    public int getTransColor(int n) {
+        GifFrame frame = frames.get(n);
+        return act[transIndex];
     }
 
     /**
@@ -122,7 +139,7 @@ public class GifDecoder {
         //
         delay = -1;
         if ((n >= 0) && (n < frameCount)) {
-            delay = ((GifFrame) frames.get(n)).delay;
+            delay = frames.get(n).delay;
         }
         return delay;
     }
@@ -161,8 +178,7 @@ public class GifDecoder {
      */
     protected void setPixels() {
         // expose destination image's pixels as int array
-        int[] dest =
-                ((DataBufferInt) image.getRaster().getDataBuffer()).getData();
+        int[] dest = ((DataBufferInt) image.getRaster().getDataBuffer()).getData();
 
         // fill in starting image contents based on last image's dispose code
         if (lastDispose > 0) {
@@ -185,12 +201,7 @@ public class GifDecoder {
                 if (lastDispose == 2) {
                     // fill last image rect area with background color
                     Graphics2D g = image.createGraphics();
-                    Color c = null;
-                    if (transparency) {
-                        c = new Color(0, 0, 0, 0);    // assume background is transparent
-                    } else {
-                        c = new Color(lastBgColor); // use given background color
-                    }
+                    Color c = transparency ? new Color(0, 0, 0, 0) : new Color(lastBgColor);
                     g.setColor(c);
                     g.setComposite(AlphaComposite.Src); // replace area
                     g.fill(lastRect);
@@ -268,7 +279,7 @@ public class GifDecoder {
     public GifFrame getFrameMeta(int n) {
         GifFrame im = null;
         if ((n >= 0) && (n < frameCount)) {
-            im = ((GifFrame) frames.get(n));
+            im = frames.get(n);
         }
         return im;
     }
@@ -285,13 +296,13 @@ public class GifDecoder {
     /**
      * Reads GIF image from stream
      *
-     * @param is BufferedInputStream containing GIF file.
+     * @param inStream BufferedInputStream containing GIF file.
      * @return read status code (0 = no errors)
      */
-    public int read(BufferedInputStream is) {
+    public int read(BufferedInputStream inStream) {
         init();
-        if (is != null) {
-            in = is;
+        if (inStream != null) {
+            this.inputStream = inStream;
             readHeader();
             if (!err()) {
                 readContents();
@@ -303,7 +314,7 @@ public class GifDecoder {
             status = STATUS_OPEN_ERROR;
         }
         try {
-            is.close();
+            inStream.close();
         } catch (IOException e) {
         }
         return status;
@@ -320,7 +331,7 @@ public class GifDecoder {
         if (is != null) {
             if (!(is instanceof BufferedInputStream))
                 is = new BufferedInputStream(is);
-            in = (BufferedInputStream) is;
+            inputStream = (BufferedInputStream) is;
             readHeader();
             if (!err()) {
                 readContents();
@@ -349,14 +360,14 @@ public class GifDecoder {
         status = STATUS_OK;
         try {
             name = name.trim().toLowerCase();
-            if ((name.indexOf("file:") >= 0) ||
+            if ((name.contains("file:")) ||
                     (name.indexOf(":/") > 0)) {
                 URL url = new URL(name);
-                in = new BufferedInputStream(url.openStream());
+                inputStream = new BufferedInputStream(url.openStream());
             } else {
-                in = new BufferedInputStream(new FileInputStream(name));
+                inputStream = new BufferedInputStream(new FileInputStream(name));
             }
-            status = read(in);
+            status = read(inputStream);
         } catch (IOException e) {
             status = STATUS_OPEN_ERROR;
         }
@@ -392,9 +403,9 @@ public class GifDecoder {
         if ((pixels == null) || (pixels.length < npix)) {
             pixels = new byte[npix]; // allocate new pixel array
         }
-        if (prefix == null) prefix = new short[MaxStackSize];
-        if (suffix == null) suffix = new byte[MaxStackSize];
-        if (pixelStack == null) pixelStack = new byte[MaxStackSize + 1];
+        if (prefix == null) prefix = new short[MAX_STACK_SIZE];
+        if (suffix == null) suffix = new byte[MAX_STACK_SIZE];
+        if (pixelStack == null) pixelStack = new byte[MAX_STACK_SIZE + 1];
 
         //  Initialize GIF data stream decoder.
 
@@ -469,7 +480,7 @@ public class GifDecoder {
 
                 //  Add a new string to the string table,
 
-                if (available >= MaxStackSize) {
+                if (available >= MAX_STACK_SIZE) {
                     pixelStack[top++] = (byte) first;
                     continue;
                 }
@@ -478,7 +489,7 @@ public class GifDecoder {
                 suffix[available] = (byte) first;
                 available++;
                 if (((available & code_mask) == 0)
-                        && (available < MaxStackSize)) {
+                        && (available < MAX_STACK_SIZE)) {
                     code_size++;
                     code_mask += available;
                 }
@@ -511,7 +522,7 @@ public class GifDecoder {
     protected void init() {
         status = STATUS_OK;
         frameCount = 0;
-        frames = new ArrayList();
+        frames = new ArrayList<GifFrame>();
         gct = null;
         lct = null;
     }
@@ -522,7 +533,7 @@ public class GifDecoder {
     protected int read() {
         int curByte = 0;
         try {
-            curByte = in.read();
+            curByte = inputStream.read();
         } catch (IOException e) {
             status = STATUS_FORMAT_ERROR;
         }
@@ -541,7 +552,7 @@ public class GifDecoder {
             try {
                 int count = 0;
                 while (n < blockSize) {
-                    count = in.read(block, n, blockSize - n);
+                    count = inputStream.read(block, n, blockSize - n);
                     if (count == -1)
                         break;
                     n += count;
@@ -568,7 +579,7 @@ public class GifDecoder {
         byte[] c = new byte[nbytes];
         int n = 0;
         try {
-            n = in.read(c);
+            n = inputStream.read(c);
         } catch (IOException e) {
         }
         if (n < nbytes) {
@@ -718,12 +729,11 @@ public class GifDecoder {
         frameCount++;
 
         // create new image to receive frame data
-        image =
-                new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB_PRE);
+        image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB_PRE);
 
         setPixels(); // transfer pixel data to image
 
-        frames.add(new GifFrame(image, delay)); // add image to frame list
+        frames.add(new GifFrame(image, delay, lctFlag ? lct : new int[0], bgIndex, transIndex)); // add image to frame list
 
         if (transparency) {
             act[transIndex] = save;
@@ -783,9 +793,9 @@ public class GifDecoder {
         lastRect = new Rectangle(ix, iy, iw, ih);
         lastImage = image;
         lastBgColor = bgColor;
-        int dispose = 0;
-        boolean transparency = false;
-        int delay = 0;
+        dispose = 0;
+        transparency = false;
+        delay = 0;
         lct = null;
     }
 
