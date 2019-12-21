@@ -62,7 +62,7 @@ public class GifDecoder {
     protected int gctSize; // size of global color table
     protected int loopCount = 1; // iterations; 0 = repeat forever
 
-    int[] gct; // global color table
+    public int[] gct; // global color table
     protected int[] lct; // local color table
     protected int[] act; // active color table
 
