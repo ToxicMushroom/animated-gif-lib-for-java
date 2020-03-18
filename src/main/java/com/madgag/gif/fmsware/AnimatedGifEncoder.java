@@ -173,7 +173,7 @@ public class AnimatedGifEncoder {
             writeGraphicCtrlExt(); // write graphic control extension
             writeImageDesc(); // image descriptor
             if (!firstFrame) {
-                writePalette(); // local color table
+                //writePalette(); // local color table
             }
             writePixels(); // encode and write pixel data
             firstFrame = false;
