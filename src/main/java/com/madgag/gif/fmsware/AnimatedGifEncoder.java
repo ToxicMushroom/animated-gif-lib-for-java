@@ -461,7 +461,7 @@ public class AnimatedGifEncoder {
             out.write(0);
         } else {
             // specify normal LCT
-            out.write(0x80 | // 1 local color table  1=yes
+            out.write(0x00 | // 1 local color table  1=yes
                     0 | // 2 interlace - 0=no
                     0 | // 3 sorted - 0=no
                     0 | // 4-5 reserved
@@ -479,7 +479,7 @@ public class AnimatedGifEncoder {
         // packed fields
         out.write((0x80 | // 1   : global color table flag = 1 (gct used)
                 0x70 | // 2-4 : color resolution = 7
-                0x08 | // 5   : gct sort flag = 0
+                0x00 | // 5   : gct sort flag = 0
                 palSize)); // 6-8 : gct size
 
         out.write(0); // background color index
