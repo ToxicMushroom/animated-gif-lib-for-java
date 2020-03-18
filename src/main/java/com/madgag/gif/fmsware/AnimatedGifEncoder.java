@@ -456,12 +456,13 @@ public class AnimatedGifEncoder {
         writeShort(width); // image size
         writeShort(height);
         // packed fields
-        if (firstFrame) {
+        //if (firstFrame) {
+        if (true) {
             // no LCT  - GCT is used for first (or only) frame
             out.write(0);
         } else {
             // specify normal LCT
-            out.write(0x00 | // 1 local color table  1=yes
+            out.write(0x80 | // 1 local color table  1=yes
                     0 | // 2 interlace - 0=no
                     0 | // 3 sorted - 0=no
                     0 | // 4-5 reserved
