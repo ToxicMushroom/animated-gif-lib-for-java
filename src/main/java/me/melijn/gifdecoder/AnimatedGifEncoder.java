@@ -1,4 +1,4 @@
-package com.madgag.gif.fmsware;
+package me.melijn.gifdecoder;
 
 import java.io.*;
 import java.awt.*;
